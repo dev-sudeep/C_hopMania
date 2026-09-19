@@ -161,10 +161,10 @@ static void init_row(WorldRow *row, int y, RowType type, int lane_idx, int total
     else if (type == ROW_ROAD) {
         /* Alternating direction across lanes, or random */
         row->direction = (lane_idx % 2 == 0) ? 1 : -1;
-        /* Varying speeds: 7.0f to 22.0f */
-        float base_speed = 8.0f + (float)(rand() % 12);
+        /* Decreased car speed slightly for smoother, fairer gameplay (6.0f to 14.0f) */
+        float base_speed = 6.0f + (float)(rand() % 8);
         if (lane_idx == 0 || lane_idx == total_lanes - 1) {
-            base_speed += 2.0f;
+            base_speed += 1.0f;
         }
         row->speed = base_speed;
 
@@ -254,22 +254,22 @@ void game_spawn_particles(GameState *game, float x, float y, int count, int type
 
         if (type == 1) {
             /* Feather / Car splat */
-            const char *feathers[] = {"*", "o", "+", "x"};
-            strncpy(p->ch, feathers[rand() % 4], 3);
+            const char *feathers[] = {"✦", "•", "✕", "*"};
+            strncpy(p->ch, feathers[rand() % 4], sizeof(p->ch) - 1);
             p->color_code = (rand() % 2 == 0) ? 93 : 91; /* Yellow or Red */
         } else if (type == 2) {
             /* Water splash */
-            const char *drops[] = {"~", ".", "*", "o"};
-            strncpy(p->ch, drops[rand() % 4], 3);
+            const char *drops[] = {"≈", "°", "~", "·"};
+            strncpy(p->ch, drops[rand() % 4], sizeof(p->ch) - 1);
             p->color_code = (rand() % 2 == 0) ? 96 : 94; /* Cyan or Blue */
         } else if (type == 3) {
             /* Coin sparkle */
-            const char *sparkles[] = {"*", "$", "+", "^"};
-            strncpy(p->ch, sparkles[rand() % 4], 3);
+            const char *sparkles[] = {"★", "✦", "✧", "◈"};
+            strncpy(p->ch, sparkles[rand() % 4], sizeof(p->ch) - 1);
             p->color_code = 93; /* Bright Yellow/Gold */
         } else {
             /* Generic */
-            strcpy(p->ch, ".");
+            strcpy(p->ch, "·");
             p->color_code = 97;
         }
     }

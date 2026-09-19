@@ -82,44 +82,51 @@ static void draw_vehicle(RenderBuffer *buf, int screen_row, int base_col, const 
         int col = base_col + v_start + i;
         if (col < base_col || col >= base_col + FIELD_WIDTH) continue;
 
-        const char *part = "=";
+        const char *part = "█";
         if (veh->type == VEHICLE_SPORT) {
             if (dir > 0) {
-                if (i == 0) part = "<";
-                else if (i == len - 1) part = ">";
-                else part = "=";
+                if (i == 0) part = "▰";
+                else if (i == len - 1) part = "►";
+                else part = "█";
             } else {
-                if (i == 0) part = "<";
-                else if (i == len - 1) part = ">";
-                else part = "=";
+                if (i == 0) part = "◄";
+                else if (i == len - 1) part = "▰";
+                else part = "█";
             }
         } else if (veh->type == VEHICLE_TRUCK) {
             if (dir > 0) {
-                if (i == len - 1) part = "]";
-                else if (i == 0) part = "[";
-                else if (i == len - 2) part = "O";
-                else part = "#";
+                if (i == len - 1) part = "►";
+                else if (i == 0) part = "▓";
+                else if (i == len - 2) part = "█";
+                else part = "▓";
             } else {
-                if (i == 0) part = "[";
-                else if (i == len - 1) part = "]";
-                else if (i == 1) part = "O";
-                else part = "#";
+                if (i == 0) part = "◄";
+                else if (i == len - 1) part = "▓";
+                else if (i == 1) part = "█";
+                else part = "▓";
             }
         } else if (veh->type == VEHICLE_BUS) {
-            if (i == 0) part = "[";
-            else if (i == len - 1) part = "]";
-            else if (i % 2 == 1) part = "#";
-            else part = "=";
+            if (dir > 0) {
+                if (i == len - 1) part = "►";
+                else if (i == 0) part = "■";
+                else if (i % 2 == 1) part = "░";
+                else part = "■";
+            } else {
+                if (i == 0) part = "◄";
+                else if (i == len - 1) part = "■";
+                else if (i % 2 == 1) part = "░";
+                else part = "■";
+            }
         } else {
             /* Standard car */
             if (dir > 0) {
-                if (i == 0) part = "(";
-                else if (i == len - 1) part = ">";
-                else part = "o";
+                if (i == 0) part = "▰";
+                else if (i == len - 1) part = "►";
+                else part = "█";
             } else {
-                if (i == 0) part = "<";
-                else if (i == len - 1) part = ")";
-                else part = "o";
+                if (i == 0) part = "◄";
+                else if (i == len - 1) part = "▰";
+                else part = "█";
             }
         }
         set_cell(buf, screen_row, col, part, style_str);
@@ -139,12 +146,12 @@ static void draw_log(RenderBuffer *buf, int screen_row, int base_col, const Log 
         if (col < base_col || col >= base_col + FIELD_WIDTH) continue;
 
         if (lg->has_coin && i == lg->coin_offset) {
-            set_cell(buf, screen_row, col, "$", coin_style);
+            set_cell(buf, screen_row, col, "★", coin_style);
         } else {
-            const char *ch = "=";
-            if (i == 0) ch = "(";
-            else if (i == len - 1) ch = ")";
-            else if (i % 2 == 0) ch = "#";
+            const char *ch = "═";
+            if (i == 0) ch = "❪";
+            else if (i == len - 1) ch = "❫";
+            else if (i % 2 == 0) ch = "▓";
             set_cell(buf, screen_row, col, ch, style);
         }
     }
@@ -185,11 +192,11 @@ void render_frame(const GameState *game, int term_w, int term_h) {
 
     /* Top border of field */
     int top_y = 1;
-    set_cell(&current_buf, top_y, 0, "+", "\033[38;2;100;110;140m");
+    set_cell(&current_buf, top_y, 0, "┌", "\033[38;2;100;110;140m");
     for (int c = 1; c <= field_w; c++) {
-        set_cell(&current_buf, top_y, c, "-", "\033[38;2;100;110;140m");
+        set_cell(&current_buf, top_y, c, "─", "\033[38;2;100;110;140m");
     }
-    set_cell(&current_buf, top_y, field_w + 1, "+", "\033[38;2;100;110;140m");
+    set_cell(&current_buf, top_y, field_w + 1, "┐", "\033[38;2;100;110;140m");
 
     /* 2. Game Field Rows */
     int cam_base_y = (int)roundf(game->camera_y);
@@ -199,8 +206,8 @@ void render_frame(const GameState *game, int term_w, int term_h) {
         int world_y = cam_base_y + (field_h - 1 - sr);
 
         /* Field Left & Right borders */
-        set_cell(&current_buf, buffer_row, 0, "|", "\033[38;2;100;110;140m");
-        set_cell(&current_buf, buffer_row, field_w + 1, "|", "\033[38;2;100;110;140m");
+        set_cell(&current_buf, buffer_row, 0, "│", "\033[38;2;100;110;140m");
+        set_cell(&current_buf, buffer_row, field_w + 1, "│", "\033[38;2;100;110;140m");
 
         if (world_y < 0) {
             /* Out of world bounds below start */
@@ -222,24 +229,24 @@ void render_frame(const GameState *game, int term_w, int term_h) {
 
                 /* Decorative grass tufts */
                 if ((fc * 7 + world_y * 13) % 19 == 0) {
-                    ch = "\"";
+                    ch = "·";
                 } else if ((fc * 11 + world_y * 17) % 23 == 0) {
-                    ch = ".";
+                    ch = "ˏ";
                 }
 
                 /* Obstacles & Coins */
                 if (row->obstacles[fc] == OBSTACLE_TREE) {
-                    ch = "A"; /* Tree canopy */
+                    ch = "▲"; /* Tree canopy */
                     fg = "\033[38;2;40;220;60;1m";
                 } else if (row->obstacles[fc] == OBSTACLE_ROCK) {
-                    ch = "o";
+                    ch = "●";
                     fg = "\033[38;2;170;170;185;1m";
                 } else if (row->obstacles[fc] == OBSTACLE_FLOWER) {
-                    ch = "*";
+                    ch = "✿";
                     fg = "\033[38;2;255;120;180;1m";
                 } else if (row->coins[fc]) {
-                    ch = "$";
-                    fg = "\033[38;2;255;220;0;1;5m"; /* Sparkling coin */
+                    ch = "★";
+                    fg = "\033[38;2;255;220;0;1;5m"; /* Sparkling golden star */
                 }
 
                 snprintf(cell_style, sizeof(cell_style), "%s%s", bg, fg);
@@ -253,7 +260,7 @@ void render_frame(const GameState *game, int term_w, int term_h) {
 
                 /* Road dashes */
                 if (fc % 5 == 2) {
-                    ch = "-";
+                    ch = "┄";
                 }
 
                 char cell_style[96];
@@ -268,10 +275,10 @@ void render_frame(const GameState *game, int term_w, int term_h) {
         }
         else if (row->type == ROW_RIVER) {
             for (int fc = 0; fc < field_w; fc++) {
-                const char *ch = "~";
+                const char *ch = "≈";
                 const char *fg = ((fc + (int)(game->frame_count / 4)) % 4 == 0) 
-                                 ? "\033[38;2;120;190;255m" 
-                                 : "\033[38;2;40;100;190m";
+                                 ? "\033[38;2;130;205;255m" 
+                                 : "\033[38;2;45;110;200m";
                 char cell_style[96];
                 snprintf(cell_style, sizeof(cell_style), "%s%s", ANSI_BG_RIVER, fg);
                 set_cell(&current_buf, buffer_row, 1 + fc, ch, cell_style);
@@ -284,7 +291,7 @@ void render_frame(const GameState *game, int term_w, int term_h) {
         }
         else if (row->type == ROW_RAILROAD) {
             for (int fc = 0; fc < field_w; fc++) {
-                const char *ch = (fc % 3 == 0) ? "|" : "=";
+                const char *ch = (fc % 3 == 0) ? "╫" : "═";
                 const char *fg = "\033[38;2;160;145;130m";
                 char cell_style[96];
                 snprintf(cell_style, sizeof(cell_style), "%s%s", ANSI_BG_TRACKS, fg);
@@ -294,9 +301,9 @@ void render_frame(const GameState *game, int term_w, int term_h) {
             /* Railroad warning lights */
             if (row->train.warning_active) {
                 const char *sig = ((game->frame_count / 4) % 2 == 0) 
-                                  ? "\033[48;2;200;30;30;1;97m[!TRAIN!]\033[0m" 
-                                  : "\033[48;2;40;40;40;1;91m[ TRAIN ]\033[0m";
-                draw_text(&current_buf, buffer_row, 1 + field_w / 2 - 4, sig, NULL);
+                                  ? "\033[48;2;200;30;30;1;97m[! ⚠ TRAIN ⚠ !]\033[0m" 
+                                  : "\033[48;2;40;40;40;1;91m[   TRAIN   ]\033[0m";
+                draw_text(&current_buf, buffer_row, 1 + field_w / 2 - 6, sig, NULL);
             }
 
             /* Railroad Train */
@@ -306,15 +313,15 @@ void render_frame(const GameState *game, int term_w, int term_h) {
                 for (int ti = 0; ti < tlen; ti++) {
                     int c = 1 + tx + ti;
                     if (c >= 1 && c <= field_w) {
-                        const char *tch = "=";
+                        const char *tch = "═";
                         if (row->direction > 0) {
-                            if (ti == tlen - 1) tch = ">";
-                            else if (ti == 0) tch = "[";
-                            else tch = "#";
+                            if (ti == tlen - 1) tch = "►";
+                            else if (ti == 0) tch = "■";
+                            else tch = "█";
                         } else {
-                            if (ti == 0) tch = "<";
-                            else if (ti == tlen - 1) tch = "]";
-                            else tch = "#";
+                            if (ti == 0) tch = "◄";
+                            else if (ti == tlen - 1) tch = "■";
+                            else tch = "█";
                         }
                         set_cell(&current_buf, buffer_row, c, tch, "\033[48;2;220;40;40m\033[38;2;255;255;255;1m");
                     }
@@ -325,11 +332,11 @@ void render_frame(const GameState *game, int term_w, int term_h) {
 
     /* Bottom border of field */
     int bottom_y = top_y + field_h + 1;
-    set_cell(&current_buf, bottom_y, 0, "+", "\033[38;2;100;110;140m");
+    set_cell(&current_buf, bottom_y, 0, "└", "\033[38;2;100;110;140m");
     for (int c = 1; c <= field_w; c++) {
-        set_cell(&current_buf, bottom_y, c, "-", "\033[38;2;100;110;140m");
+        set_cell(&current_buf, bottom_y, c, "─", "\033[38;2;100;110;140m");
     }
-    set_cell(&current_buf, bottom_y, field_w + 1, "+", "\033[38;2;100;110;140m");
+    set_cell(&current_buf, bottom_y, field_w + 1, "┘", "\033[38;2;100;110;140m");
 
     /* 3. Render Chicken / Player */
     int player_world_y = game->player.y;
@@ -340,37 +347,37 @@ void render_frame(const GameState *game, int term_w, int term_h) {
     if (player_sr >= 0 && player_sr < field_h && player_buf_col >= 1 && player_buf_col <= field_w) {
         if (game->player.is_alive) {
             /* Chicken Sprite with directional facing */
-            const char *wing_l = "(";
-            const char *body = "o";
-            const char *wing_r = ")";
+            const char *wing_l = "ˏ";
+            const char *body = "●";
+            const char *wing_r = "ˎ";
             const char *chicken_fg = "\033[38;2;255;235;40;1m"; /* Bright Neon Yellow */
 
             if (game->player.hop_anim_ticks > 0) {
-                wing_l = "\\";
-                body = "^";
-                wing_r = "/";
+                wing_l = "╲";
+                body = "★";
+                wing_r = "╱";
                 chicken_fg = "\033[38;2;255;255;130;1m";
             } else {
                 switch (game->player.facing) {
                     case DIR_UP:
-                        wing_l = "(";
-                        body = "^";
-                        wing_r = ")";
+                        wing_l = "ˏ";
+                        body = "▲";
+                        wing_r = "ˎ";
                         break;
                     case DIR_DOWN:
-                        wing_l = "(";
-                        body = "v";
-                        wing_r = ")";
+                        wing_l = "ˏ";
+                        body = "▼";
+                        wing_r = "ˎ";
                         break;
                     case DIR_LEFT:
-                        wing_l = "<";
-                        body = "o";
-                        wing_r = ")";
+                        wing_l = "◄";
+                        body = "●";
+                        wing_r = "ˎ";
                         break;
                     case DIR_RIGHT:
-                        wing_l = "(";
-                        body = "o";
-                        wing_r = ">";
+                        wing_l = "ˏ";
+                        body = "●";
+                        wing_r = "►";
                         break;
                 }
             }
@@ -391,10 +398,10 @@ void render_frame(const GameState *game, int term_w, int term_h) {
             set_cell(&current_buf, player_buf_row, player_buf_col + 1, wing_r, chk_style);
         } else {
             /* Dead chicken sprite */
-            const char *dead_ch = "X";
+            const char *dead_ch = "✖";
             const char *dead_fg = "\033[38;2;255;50;50;1m";
             if (game->death_cause == DEATH_DROWNED) {
-                dead_ch = "~";
+                dead_ch = "≈";
                 dead_fg = "\033[38;2;80;200;255;1m";
             }
             set_cell(&current_buf, player_buf_row, player_buf_col, dead_ch, dead_fg);
@@ -406,7 +413,7 @@ void render_frame(const GameState *game, int term_w, int term_h) {
         /* Eagle shadow warning above player */
         int shadow_row = player_buf_row - 1;
         if (shadow_row >= top_y + 1 && shadow_row <= bottom_y - 1) {
-            set_cell(&current_buf, shadow_row, player_buf_col, "v", "\033[38;2;40;40;40;1m");
+            set_cell(&current_buf, shadow_row, player_buf_col, "▼", "\033[38;2;40;40;40;1m");
         }
     }
     if (game->eagle_active) {
@@ -414,9 +421,9 @@ void render_frame(const GameState *game, int term_w, int term_h) {
         int eagle_buf_row = top_y + 1 + eagle_sr;
         int eagle_buf_col = 1 + (int)roundf(game->eagle_x);
         if (eagle_buf_row >= top_y + 1 && eagle_buf_row <= bottom_y - 1) {
-            set_cell(&current_buf, eagle_buf_row, eagle_buf_col - 1, "/", "\033[38;2;255;255;255;1m");
-            set_cell(&current_buf, eagle_buf_row, eagle_buf_col, "W", "\033[38;2;255;200;40;1m");
-            set_cell(&current_buf, eagle_buf_row, eagle_buf_col + 1, "\\", "\033[38;2;255;255;255;1m");
+            set_cell(&current_buf, eagle_buf_row, eagle_buf_col - 1, "◤", "\033[38;2;255;255;255;1m");
+            set_cell(&current_buf, eagle_buf_row, eagle_buf_col, "█", "\033[38;2;255;200;40;1m");
+            set_cell(&current_buf, eagle_buf_row, eagle_buf_col + 1, "◥", "\033[38;2;255;255;255;1m");
         }
     }
 
@@ -444,66 +451,80 @@ void render_frame(const GameState *game, int term_w, int term_h) {
             set_cell(&current_buf, r, c, " ", "\033[48;2;22;26;36m");
         }
     }
-    draw_text(&current_buf, top_y + 1, panel_left + 1, "[ DASHBOARD ]", "\033[38;2;255;210;40;1m\033[48;2;22;26;36m");
+    /* Side panel box border */
+    for (int c = panel_left; c < panel_left + panel_w; c++) {
+        set_cell(&current_buf, top_y, c, "─", "\033[38;2;100;110;140m\033[48;2;22;26;36m");
+        set_cell(&current_buf, bottom_y, c, "─", "\033[38;2;100;110;140m\033[48;2;22;26;36m");
+    }
+    set_cell(&current_buf, top_y, panel_left, "┌", "\033[38;2;100;110;140m\033[48;2;22;26;36m");
+    set_cell(&current_buf, top_y, panel_left + panel_w - 1, "┐", "\033[38;2;100;110;140m\033[48;2;22;26;36m");
+    set_cell(&current_buf, bottom_y, panel_left, "└", "\033[38;2;100;110;140m\033[48;2;22;26;36m");
+    set_cell(&current_buf, bottom_y, panel_left + panel_w - 1, "┘", "\033[38;2;100;110;140m\033[48;2;22;26;36m");
+    for (int r = top_y + 1; r < bottom_y; r++) {
+        set_cell(&current_buf, r, panel_left, "│", "\033[38;2;100;110;140m\033[48;2;22;26;36m");
+        set_cell(&current_buf, r, panel_left + panel_w - 1, "│", "\033[38;2;100;110;140m\033[48;2;22;26;36m");
+    }
+
+    draw_text(&current_buf, top_y + 1, panel_left + 4, "◈ DASHBOARD ◈", "\033[38;2;255;210;40;1m\033[48;2;22;26;36m");
 
     /* Score */
     char buf_text[64];
-    snprintf(buf_text, sizeof(buf_text), "DISTANCE : %-5d", game->score);
-    draw_text(&current_buf, top_y + 3, panel_left + 1, buf_text, "\033[38;2;80;240;160;1m\033[48;2;22;26;36m");
+    snprintf(buf_text, sizeof(buf_text), "◈ DISTANCE : %-5d", game->score);
+    draw_text(&current_buf, top_y + 3, panel_left + 2, buf_text, "\033[38;2;80;240;160;1m\033[48;2;22;26;36m");
 
-    snprintf(buf_text, sizeof(buf_text), "RECORD   : %-5d", game->high_score);
-    draw_text(&current_buf, top_y + 4, panel_left + 1, buf_text, "\033[38;2;255;215;0;1m\033[48;2;22;26;36m");
+    snprintf(buf_text, sizeof(buf_text), "★ RECORD   : %-5d", game->high_score);
+    draw_text(&current_buf, top_y + 4, panel_left + 2, buf_text, "\033[38;2;255;215;0;1m\033[48;2;22;26;36m");
 
-    snprintf(buf_text, sizeof(buf_text), "CORN/COIN: %-5d", game->coins_collected);
-    draw_text(&current_buf, top_y + 5, panel_left + 1, buf_text, "\033[38;2;255;180;40;1m\033[48;2;22;26;36m");
+    snprintf(buf_text, sizeof(buf_text), "✦ CORN/COIN: %-5d", game->coins_collected);
+    draw_text(&current_buf, top_y + 5, panel_left + 2, buf_text, "\033[38;2;255;180;40;1m\033[48;2;22;26;36m");
 
-    /* Stagnation / Eagle Meter */
-    draw_text(&current_buf, top_y + 7, panel_left + 1, "EAGLE ALERT:", "\033[38;2;220;220;220m\033[48;2;22;26;36m");
+    /* Stagnation / Eagle Meter using block characters */
+    draw_text(&current_buf, top_y + 7, panel_left + 2, "EAGLE ALERT:", "\033[38;2;220;220;220m\033[48;2;22;26;36m");
     float idle_pct = game->idle_timer / IDLE_TIME_LIMIT;
     if (idle_pct < 0.0f) idle_pct = 0.0f;
     int filled = (int)(idle_pct * 12.0f);
-    char meter[32];
-    snprintf(meter, sizeof(meter), "[");
+    char meter[64];
+    strcpy(meter, "[");
     for (int m = 0; m < 12; m++) {
-        if (m < filled) strcat(meter, "#");
-        else strcat(meter, ".");
+        if (m < filled) strcat(meter, "█");
+        else strcat(meter, "░");
     }
     strcat(meter, "]");
     const char *meter_color = (idle_pct > 0.4f) ? "\033[38;2;60;220;60;1m" : "\033[38;2;255;50;50;1;5m";
     char meter_style[64];
     snprintf(meter_style, sizeof(meter_style), "%s\033[48;2;22;26;36m", meter_color);
-    draw_text(&current_buf, top_y + 8, panel_left + 1, meter, meter_style);
+    draw_text(&current_buf, top_y + 8, panel_left + 2, meter, meter_style);
 
     /* Current Terrain Info */
     WorldRow *prow_info = &game->rows[game->player.y];
-    const char *zone_str = "SAFE GRASS";
+    const char *zone_str = "▲ SAFE GRASS";
     const char *zone_col = "\033[38;2;80;220;80;1m";
     if (prow_info->type == ROW_ROAD) {
         static char r_info[32];
-        snprintf(r_info, sizeof(r_info), "%d-LANE ROAD", prow_info->total_lanes);
+        snprintf(r_info, sizeof(r_info), "■ %d-LANE ROAD", prow_info->total_lanes);
         zone_str = r_info;
         zone_col = "\033[38;2;255;100;100;1m";
     } else if (prow_info->type == ROW_RIVER) {
-        zone_str = "RUSHING RIVER";
+        zone_str = "≈ RUSHING RIVER";
         zone_col = "\033[38;2;80;180;255;1m";
     } else if (prow_info->type == ROW_RAILROAD) {
-        zone_str = "RAILROAD TRACK";
+        zone_str = "╫ RAILROAD TRACK";
         zone_col = "\033[38;2;255;200;40;1m";
     }
-    draw_text(&current_buf, top_y + 10, panel_left + 1, "CURRENT ZONE:", "\033[38;2;160;170;190m\033[48;2;22;26;36m");
+    draw_text(&current_buf, top_y + 10, panel_left + 2, "CURRENT ZONE:", "\033[38;2;160;170;190m\033[48;2;22;26;36m");
     char zone_style[64];
     snprintf(zone_style, sizeof(zone_style), "%s\033[48;2;22;26;36m", zone_col);
-    draw_text(&current_buf, top_y + 11, panel_left + 1, zone_str, zone_style);
+    draw_text(&current_buf, top_y + 11, panel_left + 2, zone_str, zone_style);
 
     /* Controls Legend */
-    draw_text(&current_buf, top_y + 13, panel_left + 1, "[ CONTROLS ]", "\033[38;2;255;210;40;1m\033[48;2;22;26;36m");
-    draw_text(&current_buf, top_y + 14, panel_left + 1, " W / ^ : Hop Forward", panel_style);
-    draw_text(&current_buf, top_y + 15, panel_left + 1, " S / v : Hop Backward", panel_style);
-    draw_text(&current_buf, top_y + 16, panel_left + 1, " A / < : Move Left", panel_style);
-    draw_text(&current_buf, top_y + 17, panel_left + 1, " D / > : Move Right", panel_style);
-    draw_text(&current_buf, top_y + 18, panel_left + 1, " P     : Pause Game", panel_style);
-    draw_text(&current_buf, top_y + 19, panel_left + 1, " R     : Restart", panel_style);
-    draw_text(&current_buf, top_y + 20, panel_left + 1, " Q /Esc: Quit Game", panel_style);
+    draw_text(&current_buf, top_y + 13, panel_left + 4, "◈ CONTROLS ◈", "\033[38;2;255;210;40;1m\033[48;2;22;26;36m");
+    draw_text(&current_buf, top_y + 14, panel_left + 2, " W / ↑ : Hop Forward", panel_style);
+    draw_text(&current_buf, top_y + 15, panel_left + 2, " S / ↓ : Hop Backward", panel_style);
+    draw_text(&current_buf, top_y + 16, panel_left + 2, " A / ← : Move Left", panel_style);
+    draw_text(&current_buf, top_y + 17, panel_left + 2, " D / → : Move Right", panel_style);
+    draw_text(&current_buf, top_y + 18, panel_left + 2, " P     : Pause Game", panel_style);
+    draw_text(&current_buf, top_y + 19, panel_left + 2, " R     : Restart", panel_style);
+    draw_text(&current_buf, top_y + 20, panel_left + 2, " Q /Esc: Quit Game", panel_style);
 
     /* 7. Modal Overlays */
     if (game->mode == STATE_TITLE) {
@@ -518,14 +539,18 @@ void render_frame(const GameState *game, int term_w, int term_h) {
                 set_cell(&current_buf, r, c, " ", "\033[48;2;16;20;30m");
             }
         }
-        /* Border */
-        for (int c = mx; c < mx + mw; c++) {
-            set_cell(&current_buf, my, c, "=", "\033[38;2;255;210;40;1m\033[48;2;16;20;30m");
-            set_cell(&current_buf, my + mh - 1, c, "=", "\033[38;2;255;210;40;1m\033[48;2;16;20;30m");
+        /* Rounded Border */
+        for (int c = mx + 1; c < mx + mw - 1; c++) {
+            set_cell(&current_buf, my, c, "─", "\033[38;2;255;210;40;1m\033[48;2;16;20;30m");
+            set_cell(&current_buf, my + mh - 1, c, "─", "\033[38;2;255;210;40;1m\033[48;2;16;20;30m");
         }
-        for (int r = my; r < my + mh; r++) {
-            set_cell(&current_buf, r, mx, "|", "\033[38;2;255;210;40;1m\033[48;2;16;20;30m");
-            set_cell(&current_buf, r, mx + mw - 1, "|", "\033[38;2;255;210;40;1m\033[48;2;16;20;30m");
+        set_cell(&current_buf, my, mx, "╭", "\033[38;2;255;210;40;1m\033[48;2;16;20;30m");
+        set_cell(&current_buf, my, mx + mw - 1, "╮", "\033[38;2;255;210;40;1m\033[48;2;16;20;30m");
+        set_cell(&current_buf, my + mh - 1, mx, "╰", "\033[38;2;255;210;40;1m\033[48;2;16;20;30m");
+        set_cell(&current_buf, my + mh - 1, mx + mw - 1, "╯", "\033[38;2;255;210;40;1m\033[48;2;16;20;30m");
+        for (int r = my + 1; r < my + mh - 1; r++) {
+            set_cell(&current_buf, r, mx, "│", "\033[38;2;255;210;40;1m\033[48;2;16;20;30m");
+            set_cell(&current_buf, r, mx + mw - 1, "│", "\033[38;2;255;210;40;1m\033[48;2;16;20;30m");
         }
 
         draw_text(&current_buf, my + 1, mx + 12, "★ HOP MANIA ★", "\033[38;2;255;220;0;1m\033[48;2;16;20;30m");
@@ -553,11 +578,19 @@ void render_frame(const GameState *game, int term_w, int term_h) {
                 set_cell(&current_buf, r, c, " ", "\033[48;2;28;32;44m");
             }
         }
-        for (int c = mx; c < mx + mw; c++) {
-            set_cell(&current_buf, my, c, "=", "\033[38;2;80;180;255;1m\033[48;2;28;32;44m");
-            set_cell(&current_buf, my + mh - 1, c, "=", "\033[38;2;80;180;255;1m\033[48;2;28;32;44m");
+        for (int c = mx + 1; c < mx + mw - 1; c++) {
+            set_cell(&current_buf, my, c, "─", "\033[38;2;80;180;255;1m\033[48;2;28;32;44m");
+            set_cell(&current_buf, my + mh - 1, c, "─", "\033[38;2;80;180;255;1m\033[48;2;28;32;44m");
         }
-        draw_text(&current_buf, my + 2, mx + 7, "== GAME PAUSED ==", "\033[38;2;80;220;255;1m\033[48;2;28;32;44m");
+        set_cell(&current_buf, my, mx, "╭", "\033[38;2;80;180;255;1m\033[48;2;28;32;44m");
+        set_cell(&current_buf, my, mx + mw - 1, "╮", "\033[38;2;80;180;255;1m\033[48;2;28;32;44m");
+        set_cell(&current_buf, my + mh - 1, mx, "╰", "\033[38;2;80;180;255;1m\033[48;2;28;32;44m");
+        set_cell(&current_buf, my + mh - 1, mx + mw - 1, "╯", "\033[38;2;80;180;255;1m\033[48;2;28;32;44m");
+        for (int r = my + 1; r < my + mh - 1; r++) {
+            set_cell(&current_buf, r, mx, "│", "\033[38;2;80;180;255;1m\033[48;2;28;32;44m");
+            set_cell(&current_buf, r, mx + mw - 1, "│", "\033[38;2;80;180;255;1m\033[48;2;28;32;44m");
+        }
+        draw_text(&current_buf, my + 2, mx + 7, "◈ GAME PAUSED ◈", "\033[38;2;80;220;255;1m\033[48;2;28;32;44m");
         draw_text(&current_buf, my + 3, mx + 4, "Press [P] to Resume Play", "\033[38;2;220;220;220m\033[48;2;28;32;44m");
         draw_text(&current_buf, my + 4, mx + 6, "Press [Q] to Quit Game", "\033[38;2;160;160;180m\033[48;2;28;32;44m");
     }
@@ -572,16 +605,20 @@ void render_frame(const GameState *game, int term_w, int term_h) {
                 set_cell(&current_buf, r, c, " ", "\033[48;2;32;16;20m");
             }
         }
-        for (int c = mx; c < mx + mw; c++) {
-            set_cell(&current_buf, my, c, "=", "\033[38;2;255;60;80;1m\033[48;2;32;16;20m");
-            set_cell(&current_buf, my + mh - 1, c, "=", "\033[38;2;255;60;80;1m\033[48;2;32;16;20m");
+        for (int c = mx + 1; c < mx + mw - 1; c++) {
+            set_cell(&current_buf, my, c, "─", "\033[38;2;255;60;80;1m\033[48;2;32;16;20m");
+            set_cell(&current_buf, my + mh - 1, c, "─", "\033[38;2;255;60;80;1m\033[48;2;32;16;20m");
         }
-        for (int r = my; r < my + mh; r++) {
-            set_cell(&current_buf, r, mx, "|", "\033[38;2;255;60;80;1m\033[48;2;32;16;20m");
-            set_cell(&current_buf, r, mx + mw - 1, "|", "\033[38;2;255;60;80;1m\033[48;2;32;16;20m");
+        set_cell(&current_buf, my, mx, "╭", "\033[38;2;255;60;80;1m\033[48;2;32;16;20m");
+        set_cell(&current_buf, my, mx + mw - 1, "╮", "\033[38;2;255;60;80;1m\033[48;2;32;16;20m");
+        set_cell(&current_buf, my + mh - 1, mx, "╰", "\033[38;2;255;60;80;1m\033[48;2;32;16;20m");
+        set_cell(&current_buf, my + mh - 1, mx + mw - 1, "╯", "\033[38;2;255;60;80;1m\033[48;2;32;16;20m");
+        for (int r = my + 1; r < my + mh - 1; r++) {
+            set_cell(&current_buf, r, mx, "│", "\033[38;2;255;60;80;1m\033[48;2;32;16;20m");
+            set_cell(&current_buf, r, mx + mw - 1, "│", "\033[38;2;255;60;80;1m\033[48;2;32;16;20m");
         }
 
-        draw_text(&current_buf, my + 1, mx + 13, "! GAME OVER !", "\033[38;2;255;50;50;1;5m\033[48;2;32;16;20m");
+        draw_text(&current_buf, my + 1, mx + 13, "✖ GAME OVER ✖", "\033[38;2;255;50;50;1;5m\033[48;2;32;16;20m");
 
         const char *cause_str = "You died!";
         switch (game->death_cause) {

@@ -73,7 +73,7 @@ typedef struct {
     float vy;
     int life;
     int max_life;
-    char ch[4];           /* UTF-8 or ASCII char */
+    char ch[8];           /* UTF-8 or ASCII char */
     int color_code;       /* ANSI color */
     bool active;
 } Particle;
