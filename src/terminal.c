@@ -91,7 +91,21 @@ void terminal_get_size(int *width, int *height) {
     }
 }
 
+#include <poll.h>
+
+static int input_ready_timeout(int timeout_ms) {
+    struct pollfd pfd;
+    pfd.fd = STDIN_FILENO;
+    pfd.events = POLLIN;
+    pfd.revents = 0;
+    return poll(&pfd, 1, timeout_ms);
+}
+
 KeyInput terminal_read_key(void) {
+    if (input_ready_timeout(0) <= 0) {
+        return KEY_NONE;
+    }
+
     char c;
     ssize_t n = read(STDIN_FILENO, &c, 1);
     if (n <= 0) {
@@ -100,22 +114,38 @@ KeyInput terminal_read_key(void) {
 
     /* Check for escape sequence */
     if (c == '\033') {
-        char seq[4];
-        /* Try reading next characters */
-        if (read(STDIN_FILENO, &seq[0], 1) <= 0) {
-            return KEY_QUIT; /* Escape key alone */
-        }
-        if (read(STDIN_FILENO, &seq[1], 1) <= 0) {
-            return KEY_NONE;
+        /* Wait up to 30ms to see if more bytes follow \033 */
+        if (input_ready_timeout(30) <= 0) {
+            return KEY_QUIT; /* Standalone ESC pressed */
         }
 
-        if (seq[0] == '[') {
+        char seq[8] = {0};
+        if (read(STDIN_FILENO, &seq[0], 1) <= 0) {
+            return KEY_QUIT;
+        }
+
+        if (seq[0] == '[' || seq[0] == 'O') {
+            if (input_ready_timeout(30) <= 0) {
+                return KEY_NONE;
+            }
+            if (read(STDIN_FILENO, &seq[1], 1) <= 0) {
+                return KEY_NONE;
+            }
+
             switch (seq[1]) {
-                case 'A': return KEY_FORWARD;    /* Up arrow = move forward */
-                case 'B': return KEY_BACKWARD;   /* Down arrow = move backward */
+                case 'A': return KEY_FORWARD;    /* Up arrow */
+                case 'B': return KEY_BACKWARD;   /* Down arrow */
                 case 'C': return KEY_MOVE_RIGHT; /* Right arrow */
                 case 'D': return KEY_MOVE_LEFT;  /* Left arrow */
                 default: break;
+            }
+
+            /* Drain any remaining characters in multi-byte sequence */
+            char extra;
+            while (input_ready_timeout(10) > 0 && read(STDIN_FILENO, &extra, 1) > 0) {
+                if ((extra >= 'A' && extra <= 'Z') || (extra >= 'a' && extra <= 'z') || extra == '~') {
+                    break;
+                }
             }
         }
         return KEY_NONE;

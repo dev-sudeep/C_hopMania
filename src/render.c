@@ -8,10 +8,26 @@
 #include <math.h>
 
 static RenderBuffer current_buf;
-static char out_string[524288]; /* 512 KB buffer for atomic frame write */
+static RenderBuffer prev_buf;
+static bool force_full_redraw = true;
+static int last_origin_x = -1;
+static int last_origin_y = -1;
+static int last_total_w = -1;
+static int last_total_h = -1;
+static char out_string[262144]; /* 256 KB buffer */
+
+void render_force_redraw(void) {
+    force_full_redraw = true;
+}
 
 void render_init(void) {
     memset(&current_buf, 0, sizeof(RenderBuffer));
+    memset(&prev_buf, 0, sizeof(RenderBuffer));
+    force_full_redraw = true;
+    last_origin_x = -1;
+    last_origin_y = -1;
+    last_total_w = -1;
+    last_total_h = -1;
 }
 
 static void safe_write(const char *buf, size_t len) {
@@ -654,29 +670,101 @@ void render_frame(const GameState *game, int term_w, int term_h) {
         draw_text(&current_buf, my + 10, mx + 11, "Press [Q] to Quit to Shell", "\033[38;2;180;180;180m\033[48;2;32;16;20m");
     }
 
-    /* 8. Atomic Serialized Frame Output to Terminal */
-    int out_pos = 0;
-    out_pos += snprintf(out_string + out_pos, sizeof(out_string) - out_pos, "\033[H");
+    /* 8. Differential Serialized Frame Output to Terminal */
+    static int last_game_mode = -1;
+    if (origin_x != last_origin_x || origin_y != last_origin_y ||
+        total_w != last_total_w || total_h != last_total_h ||
+        (int)game->mode != last_game_mode) {
+        force_full_redraw = true;
+        last_origin_x = origin_x;
+        last_origin_y = origin_y;
+        last_total_w = total_w;
+        last_total_h = total_h;
+        last_game_mode = (int)game->mode;
+    }
 
-    for (int r = 0; r < total_h; r++) {
-        /* Move cursor to line (1-indexed) */
-        out_pos += snprintf(out_string + out_pos, sizeof(out_string) - out_pos, "\033[%d;%dH", origin_y + 1 + r, origin_x + 1);
+    int out_pos = 0;
+
+    if (force_full_redraw) {
+        /* Full redraw: clear and redraw all rows */
+        out_pos += snprintf(out_string + out_pos, sizeof(out_string) - out_pos, "\033[2J\033[H");
 
         const char *last_style = "";
-        for (int c = 0; c < total_w; c++) {
-            RenderCell *cell = &current_buf.cells[r][c];
-            if (strcmp(cell->style, last_style) != 0) {
-                out_pos += snprintf(out_string + out_pos, sizeof(out_string) - out_pos, "\033[0m%s", cell->style);
-                last_style = cell->style;
-            }
-            const char *ch = (cell->ch[0] != '\0') ? cell->ch : " ";
-            int ch_len = strlen(ch);
-            if (out_pos + ch_len < (int)sizeof(out_string) - 64) {
-                memcpy(out_string + out_pos, ch, ch_len);
-                out_pos += ch_len;
+        for (int r = 0; r < total_h; r++) {
+            out_pos += snprintf(out_string + out_pos, sizeof(out_string) - out_pos,
+                                "\033[%d;%dH", origin_y + 1 + r, origin_x + 1);
+
+            for (int c = 0; c < total_w; c++) {
+                RenderCell *cell = &current_buf.cells[r][c];
+                if (strcmp(cell->style, last_style) != 0) {
+                    out_pos += snprintf(out_string + out_pos, sizeof(out_string) - out_pos,
+                                        "\033[0m%s", cell->style);
+                    last_style = cell->style;
+                }
+                const char *ch = (cell->ch[0] != '\0') ? cell->ch : " ";
+                int ch_len = strlen(ch);
+                if (out_pos + ch_len < (int)sizeof(out_string) - 64) {
+                    memcpy(out_string + out_pos, ch, ch_len);
+                    out_pos += ch_len;
+                }
             }
         }
         out_pos += snprintf(out_string + out_pos, sizeof(out_string) - out_pos, "\033[0m");
+
+        memcpy(&prev_buf, &current_buf, sizeof(RenderBuffer));
+        force_full_redraw = false;
+    } else {
+        /* Differential update: emit only spans of cells that changed */
+        const char *last_style = "";
+
+        for (int r = 0; r < total_h; r++) {
+            int c = 0;
+            while (c < total_w) {
+                /* Skip unchanged cells */
+                while (c < total_w &&
+                       strcmp(current_buf.cells[r][c].ch, prev_buf.cells[r][c].ch) == 0 &&
+                       strcmp(current_buf.cells[r][c].style, prev_buf.cells[r][c].style) == 0) {
+                    c++;
+                }
+
+                if (c >= total_w) break;
+
+                /* Move cursor to changed cell */
+                int span_start = c;
+                out_pos += snprintf(out_string + out_pos, sizeof(out_string) - out_pos,
+                                    "\033[%d;%dH", origin_y + 1 + r, origin_x + 1 + span_start);
+
+                /* Write consecutive changed cells */
+                while (c < total_w) {
+                    RenderCell *cur = &current_buf.cells[r][c];
+                    RenderCell *prv = &prev_buf.cells[r][c];
+
+                    if (strcmp(cur->ch, prv->ch) == 0 && strcmp(cur->style, prv->style) == 0) {
+                        break;
+                    }
+
+                    if (strcmp(cur->style, last_style) != 0) {
+                        out_pos += snprintf(out_string + out_pos, sizeof(out_string) - out_pos,
+                                            "\033[0m%s", cur->style);
+                        last_style = cur->style;
+                    }
+
+                    const char *ch = (cur->ch[0] != '\0') ? cur->ch : " ";
+                    int ch_len = strlen(ch);
+                    if (out_pos + ch_len < (int)sizeof(out_string) - 64) {
+                        memcpy(out_string + out_pos, ch, ch_len);
+                        out_pos += ch_len;
+                    }
+
+                    memcpy(prv, cur, sizeof(RenderCell));
+                    c++;
+                }
+            }
+        }
+
+        if (out_pos > 0) {
+            out_pos += snprintf(out_string + out_pos, sizeof(out_string) - out_pos, "\033[0m");
+        }
     }
 
     /* Single write system call */

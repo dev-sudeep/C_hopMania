@@ -24,6 +24,7 @@ typedef struct {
 void render_init(void);
 void render_cleanup(void);
 void render_frame(const GameState *game, int term_w, int term_h);
+void render_force_redraw(void);
 
 /* Color constants / ANSI helpers */
 #define ANSI_RESET        "\033[0m"
