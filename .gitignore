@@ -1,0 +1,16 @@
+# Binaries and build objects
+bin/
+obj/
+*.o
+*.out
+
+# Saved high scores
+.c_hop_highscore
+highscore.dat
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
