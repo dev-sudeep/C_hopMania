@@ -65,18 +65,8 @@ int main(int argc, char *argv[]) {
 
         /* Poll all queued key inputs */
         KeyInput key;
-        int moves_this_frame = 0;
         while ((key = terminal_read_key()) != KEY_NONE) {
-            if (key == KEY_FORWARD || key == KEY_BACKWARD ||
-                key == KEY_MOVE_LEFT || key == KEY_MOVE_RIGHT) {
-                if (moves_this_frame < 1) {
-                    game_handle_input(&game, key);
-                    moves_this_frame++;
-                }
-                /* Discard excessive movement buffer buildup from any key repeat or delay */
-            } else {
-                game_handle_input(&game, key);
-            }
+            game_handle_input(&game, key);
         }
 
         /* Update simulation */

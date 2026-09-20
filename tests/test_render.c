@@ -41,6 +41,18 @@ int main(void) {
     game.mode = STATE_PAUSED;
     render_frame(&game, 80, 24);
 
+    /* Test railroad warning lights and passing train */
+    game.mode = STATE_PLAYING;
+    WorldRow *rr_row = game_get_row(&game, 2);
+    rr_row->type = ROW_RAILROAD;
+    rr_row->train.warning_active = true;
+    render_frame(&game, 80, 24);
+    rr_row->train.warning_active = false;
+    rr_row->train.is_passing = true;
+    rr_row->train.x = 10.0f;
+    rr_row->train.length = 20;
+    render_frame(&game, 80, 24);
+
     /* Test gameover state */
     game.mode = STATE_GAMEOVER;
     game.death_cause = DEATH_CAR_HIT;

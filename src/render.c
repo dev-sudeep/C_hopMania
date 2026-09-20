@@ -43,6 +43,8 @@ void render_cleanup(void) {
 /* Helper to set a cell */
 static void set_cell(RenderBuffer *buf, int row, int col, const char *ch, const char *style) {
     if (row < 0 || row >= MAX_RENDER_ROWS || col < 0 || col >= MAX_RENDER_COLS) return;
+    if (!ch || ch[0] == '\033') return; /* Never allow raw ESC in character content */
+
     strncpy(buf->cells[row][col].ch, ch, sizeof(buf->cells[row][col].ch) - 1);
     buf->cells[row][col].ch[sizeof(buf->cells[row][col].ch) - 1] = '\0';
     if (style) {
@@ -58,6 +60,19 @@ static void draw_text(RenderBuffer *buf, int row, int col, const char *str, cons
     int cur_col = col;
     const char *p = str;
     while (*p && cur_col < MAX_RENDER_COLS) {
+        /* Skip any embedded ANSI escape sequences so raw escapes are never drawn as text */
+        if (*p == '\033') {
+            p++;
+            if (*p == '[') {
+                p++;
+                while (*p && !((*p >= 'A' && *p <= 'Z') || (*p >= 'a' && *p <= 'z') || *p == '~')) {
+                    p++;
+                }
+                if (*p) p++;
+            }
+            continue;
+        }
+
         char ch_buf[8] = {0};
         int len = 1;
         /* UTF-8 multi-byte handling */
@@ -316,10 +331,13 @@ void render_frame(const GameState *game, int term_w, int term_h) {
 
             /* Railroad warning lights */
             if (row->train.warning_active) {
-                const char *sig = ((game->frame_count / 4) % 2 == 0) 
-                                  ? "\033[48;2;200;30;30;1;97m[! ⚠ TRAIN ⚠ !]\033[0m" 
-                                  : "\033[48;2;40;40;40;1;91m[   TRAIN   ]\033[0m";
-                draw_text(&current_buf, buffer_row, 1 + field_w / 2 - 6, sig, NULL);
+                const char *sig_text = ((game->frame_count / 4) % 2 == 0) 
+                                       ? "[! ⚠ TRAIN ⚠ !]" 
+                                       : "[   TRAIN   ]";
+                const char *sig_style = ((game->frame_count / 4) % 2 == 0)
+                                        ? "\033[48;2;200;30;30m\033[38;2;255;255;255;1m"
+                                        : "\033[48;2;40;40;40m\033[38;2;255;60;60;1m";
+                draw_text(&current_buf, buffer_row, 1 + field_w / 2 - 7, sig_text, sig_style);
             }
 
             /* Railroad Train */
@@ -743,7 +761,7 @@ void render_frame(const GameState *game, int term_w, int term_h) {
                         break;
                     }
 
-                    if (strcmp(cur->style, last_style) != 0) {
+                    if (c == span_start || strcmp(cur->style, last_style) != 0) {
                         out_pos += snprintf(out_string + out_pos, sizeof(out_string) - out_pos,
                                             "\033[0m%s", cur->style);
                         last_style = cur->style;

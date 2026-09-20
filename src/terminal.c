@@ -8,10 +8,18 @@
 #include <sys/ioctl.h>
 #include <signal.h>
 #include <string.h>
+#include <fcntl.h>
+#include <poll.h>
 
 static struct termios orig_termios;
 static bool raw_mode_enabled = false;
 static volatile sig_atomic_t resize_pending = 0;
+static int orig_stdin_flags = 0;
+
+#define INBUF_SIZE 256
+static char inbuf[INBUF_SIZE];
+static int inbuf_head = 0;
+static int inbuf_tail = 0;
 
 static void on_sigwinch(int sig) {
     (void)sig;
@@ -55,6 +63,11 @@ bool terminal_init(void) {
         return false;
     }
 
+    orig_stdin_flags = fcntl(STDIN_FILENO, F_GETFL, 0);
+    if (orig_stdin_flags != -1) {
+        fcntl(STDIN_FILENO, F_SETFL, orig_stdin_flags | O_NONBLOCK);
+    }
+
     raw_mode_enabled = true;
     atexit(terminal_restore);
 
@@ -76,6 +89,10 @@ void terminal_restore(void) {
         const char *cleanup_seq = "\033[0m\033[?25h\033[?1049l";
         safe_write(cleanup_seq, strlen(cleanup_seq));
         tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
+        if (orig_stdin_flags != -1) {
+            fcntl(STDIN_FILENO, F_SETFL, orig_stdin_flags);
+        }
+        inbuf_head = inbuf_tail = 0;
         raw_mode_enabled = false;
     }
 }
@@ -91,48 +108,58 @@ void terminal_get_size(int *width, int *height) {
     }
 }
 
-#include <poll.h>
+static void refill_inbuf(void) {
+    if (inbuf_head >= inbuf_tail) {
+        inbuf_head = 0;
+        inbuf_tail = 0;
+        ssize_t n = read(STDIN_FILENO, inbuf, sizeof(inbuf));
+        if (n > 0) {
+            inbuf_tail = (int)n;
+        }
+    }
+}
 
-static int input_ready_timeout(int timeout_ms) {
+static int inbuf_has_data(void) {
+    if (inbuf_head < inbuf_tail) return 1;
+    refill_inbuf();
+    return (inbuf_head < inbuf_tail);
+}
+
+static int wait_for_data(int timeout_ms) {
+    if (inbuf_head < inbuf_tail) return 1;
     struct pollfd pfd;
     pfd.fd = STDIN_FILENO;
     pfd.events = POLLIN;
     pfd.revents = 0;
-    return poll(&pfd, 1, timeout_ms);
+    if (poll(&pfd, 1, timeout_ms) > 0) {
+        refill_inbuf();
+        return (inbuf_head < inbuf_tail);
+    }
+    return 0;
 }
 
 KeyInput terminal_read_key(void) {
-    if (input_ready_timeout(0) <= 0) {
+    if (!inbuf_has_data()) {
         return KEY_NONE;
     }
 
-    char c;
-    ssize_t n = read(STDIN_FILENO, &c, 1);
-    if (n <= 0) {
-        return KEY_NONE;
-    }
+    char c = inbuf[inbuf_head++];
 
     /* Check for escape sequence */
     if (c == '\033') {
-        /* Wait up to 30ms to see if more bytes follow \033 */
-        if (input_ready_timeout(30) <= 0) {
-            return KEY_QUIT; /* Standalone ESC pressed */
-        }
-
-        char seq[8] = {0};
-        if (read(STDIN_FILENO, &seq[0], 1) <= 0) {
+        /* If no more data follows within 10ms, treat as standalone ESC */
+        if (!wait_for_data(10)) {
             return KEY_QUIT;
         }
 
-        if (seq[0] == '[' || seq[0] == 'O') {
-            if (input_ready_timeout(30) <= 0) {
-                return KEY_NONE;
-            }
-            if (read(STDIN_FILENO, &seq[1], 1) <= 0) {
+        char c1 = inbuf[inbuf_head++];
+        if (c1 == '[' || c1 == 'O') {
+            if (!wait_for_data(10)) {
                 return KEY_NONE;
             }
 
-            switch (seq[1]) {
+            char c2 = inbuf[inbuf_head++];
+            switch (c2) {
                 case 'A': return KEY_FORWARD;    /* Up arrow */
                 case 'B': return KEY_BACKWARD;   /* Down arrow */
                 case 'C': return KEY_MOVE_RIGHT; /* Right arrow */
@@ -140,10 +167,10 @@ KeyInput terminal_read_key(void) {
                 default: break;
             }
 
-            /* Drain any remaining characters in multi-byte sequence */
-            char extra;
-            while (input_ready_timeout(10) > 0 && read(STDIN_FILENO, &extra, 1) > 0) {
-                if ((extra >= 'A' && extra <= 'Z') || (extra >= 'a' && extra <= 'z') || extra == '~') {
+            /* Drain multi-character sequences (e.g. mouse or function keys [1~, [<35;...) */
+            while (inbuf_has_data()) {
+                char ch = inbuf[inbuf_head++];
+                if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || ch == '~') {
                     break;
                 }
             }
